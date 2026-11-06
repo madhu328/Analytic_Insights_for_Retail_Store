@@ -1,0 +1,9 @@
+[project]
+name = "store-intelligence"
+version = "1.0.0"
+description = "CCTV + POS retail analytics: sessions, conversion, funnel, heatmap, anomalies"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

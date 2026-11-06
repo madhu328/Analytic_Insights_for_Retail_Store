@@ -1,0 +1,6 @@
+# Vision pipeline (CCTV -> events). Heavy; only needed to process video.
+-r requirements.txt
+ultralytics>=8.3        # YOLO11m + ByteTrack
+opencv-python-headless>=4.9
+# Optional: OSNet Re-ID for CAM3 (falls back to HSV histograms if missing)
+# torchreid @ git+https://github.com/KaiyangZhou/deep-person-reid.git

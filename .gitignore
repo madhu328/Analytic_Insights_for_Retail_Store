@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+*.egg-info/
+# databases are rebuilt from raw events (python scripts/seed_demo.py)
+*.db
+*.db-wal
+*.db-shm
+# video / model weights
+*.mp4
+*.avi
+*.pt
+videos/
+reid_gallery.json
+.DS_Store
+.env
