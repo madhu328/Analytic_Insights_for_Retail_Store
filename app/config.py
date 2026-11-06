@@ -22,6 +22,7 @@ class Settings:
     layout_path: Path = field(
         default_factory=lambda: Path(os.getenv("STORE_LAYOUT", ROOT / "config" / "store_layout.json"))
     )
+    reports_dir: Path = field(default_factory=lambda: Path(os.getenv("REPORTS_DIR", ROOT / "reports")))
     # POS correlation: billing activity must happen this many minutes before the POS timestamp.
     match_window_before_min: float = field(default_factory=lambda: _f("MATCH_WINDOW_BEFORE_MIN", 5))
     # Grace after the POS timestamp (clock skew between CCTV DVR and POS terminal).

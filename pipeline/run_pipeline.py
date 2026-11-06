@@ -16,7 +16,10 @@ import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+import os
+
 from .emit import EventEmitter
+from .filters import DetectionFilter
 from .processors import build_processor
 from .reid import Embedder, ReIDManager, SessionStore
 
@@ -68,6 +71,22 @@ def draw_debug(frame, cam_cfg: dict, tracks, proc):  # pragma: no cover - visual
     return frame
 
 
+def process_video(video: str, store_id: str, camera: str, start_time: str, out: str, *,
+                  layout: str | None = None, model: str = "yolo11m.pt", fps: float = 5.0,
+                  conf: float = 0.35, imgsz: int = 960, device: str | None = None,
+                  reid_gallery: str | None = None, tracker: str | None = None) -> list[dict]:
+    """Programmatic entry point (used by training/batch_process.py)."""
+    argv = ["--store-id", store_id, "--camera", camera, "--video", video, "--start-time", start_time,
+            "--out", out, "--model", model, "--fps", str(fps), "--conf", str(conf), "--imgsz", str(imgsz)]
+    for flag, val in (("--layout", layout), ("--device", device), ("--reid-gallery", reid_gallery),
+                      ("--tracker", tracker)):
+        if val:
+            argv += [flag, val]
+    main(argv)
+    with open(out) as fh:
+        return [json.loads(x) for x in fh if x.strip()]
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--store-id", required=True)
@@ -76,7 +95,10 @@ def main(argv=None) -> int:
     ap.add_argument("--start-time", required=True, help="wall-clock time of the first frame (ISO-8601)")
     ap.add_argument("--layout", default=str(ROOT / "config" / "store_layout.json"))
     ap.add_argument("--out", help="JSONL output path")
-    ap.add_argument("--model", default="yolo11m.pt")
+    ap.add_argument("--model", default=os.getenv("DETECTOR_WEIGHTS", "yolo11m.pt"),
+                    help="YOLO weights; use your fine-tuned models/store_yolo11m.pt for best accuracy")
+    ap.add_argument("--tracker", default=None, help="tracker yaml (default config/bytetrack_store.yaml)")
+    ap.add_argument("--imgsz", type=int, default=960)
     ap.add_argument("--device", default=None)
     ap.add_argument("--fps", type=float, default=5.0, help="processing frame rate")
     ap.add_argument("--conf", type=float, default=0.35)
@@ -97,12 +119,14 @@ def main(argv=None) -> int:
         kw = {"reid": ReIDManager(store, threshold=args.reid_threshold), "embedder": Embedder()}
         print(f"Re-ID embedder: {kw['embedder'].kind}", file=sys.stderr)
     proc = build_processor(cam, emitter, **kw)
-    tracker = PersonTracker(args.model, conf=args.conf, device=args.device)
+    tracker = PersonTracker(args.model, conf=args.conf, device=args.device, tracker_cfg=args.tracker,
+                            imgsz=args.imgsz)
+    det_filter = DetectionFilter.from_camera(cam)
     t0 = parse_ts(args.start_time)
     writer = None
     n = 0
     for idx, sec, frame in iter_frames(args.video, args.fps):
-        tracks = tracker.update(frame, keep_crops=cam.get("role") == "entry")
+        tracks = det_filter(tracker.update(frame, keep_crops=cam.get("role") == "entry"))
         proc.update(t0 + timedelta(seconds=sec), tracks)
         n += 1
         if args.debug_video:  # pragma: no cover

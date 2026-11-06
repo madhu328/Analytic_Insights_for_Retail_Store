@@ -46,6 +46,11 @@ class EventEmitter:
         self.events.append(ev)
         return ev
 
+    def drop(self, visitor_ids: set[str]) -> None:
+        """Remove every event of visitors judged to be false positives."""
+        if visitor_ids:
+            self.events = [e for e in self.events if e["visitor_id"] not in visitor_ids]
+
     def mark_staff(self, visitor_ids: set[str]) -> None:
         self.staff |= set(visitor_ids)
 

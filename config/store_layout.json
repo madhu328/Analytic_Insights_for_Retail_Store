@@ -414,7 +414,13 @@
                 ]
               ]
             }
-          ]
+          ],
+          "exclude_polygons": [],
+          "filters": {
+            "min_box_area": 0.002,
+            "max_box_area": 0.6,
+            "min_conf": 0.0
+          }
         },
         "CAM2": {
           "camera_id": "CAM_SHELF_02",
@@ -590,7 +596,13 @@
                 ]
               ]
             }
-          ]
+          ],
+          "exclude_polygons": [],
+          "filters": {
+            "min_box_area": 0.002,
+            "max_box_area": 0.6,
+            "min_conf": 0.0
+          }
         },
         "CAM3": {
           "camera_id": "CAM_ENTRY_01",
@@ -610,7 +622,13 @@
           "inside_point": [
             0.2,
             0.4
-          ]
+          ],
+          "exclude_polygons": [],
+          "filters": {
+            "min_box_area": 0.002,
+            "max_box_area": 0.6,
+            "min_conf": 0.0
+          }
         },
         "CAM5": {
           "camera_id": "CAM_BILLING_01",
@@ -658,6 +676,12 @@
                 0.92
               ]
             ]
+          },
+          "exclude_polygons": [],
+          "filters": {
+            "min_box_area": 0.002,
+            "max_box_area": 0.6,
+            "min_conf": 0.0
           }
         }
       }
@@ -825,7 +849,13 @@
                 ]
               ]
             }
-          ]
+          ],
+          "exclude_polygons": [],
+          "filters": {
+            "min_box_area": 0.002,
+            "max_box_area": 0.6,
+            "min_conf": 0.0
+          }
         },
         "CAM2": {
           "camera_id": "CAM_SHELF_02",
@@ -938,7 +968,13 @@
                 ]
               ]
             }
-          ]
+          ],
+          "exclude_polygons": [],
+          "filters": {
+            "min_box_area": 0.002,
+            "max_box_area": 0.6,
+            "min_conf": 0.0
+          }
         },
         "CAM3": {
           "camera_id": "CAM_ENTRY_01",
@@ -958,7 +994,13 @@
           "inside_point": [
             0.2,
             0.4
-          ]
+          ],
+          "exclude_polygons": [],
+          "filters": {
+            "min_box_area": 0.002,
+            "max_box_area": 0.6,
+            "min_conf": 0.0
+          }
         },
         "CAM5": {
           "camera_id": "CAM_BILLING_01",
@@ -1006,6 +1048,12 @@
                 0.92
               ]
             ]
+          },
+          "exclude_polygons": [],
+          "filters": {
+            "min_box_area": 0.002,
+            "max_box_area": 0.6,
+            "min_conf": 0.0
           }
         }
       }

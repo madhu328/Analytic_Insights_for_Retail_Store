@@ -1,0 +1,8 @@
+# ByteTrack tuned for retail CCTV processed at ~5 fps (ultralytics tracker config).
+tracker_type: bytetrack
+track_high_thresh: 0.45   # first association stage
+track_low_thresh: 0.10    # second stage re-uses low-confidence (occluded) boxes
+new_track_thresh: 0.55    # avoid spawning IDs from flickering false positives
+track_buffer: 60          # ~12 s at 5 fps: keep IDs through shelf/counter occlusions
+match_thresh: 0.80
+fuse_score: true

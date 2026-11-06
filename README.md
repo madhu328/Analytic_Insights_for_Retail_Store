@@ -16,12 +16,22 @@ pip install -r requirements.txt
 python scripts/seed_demo.py --reset          # loads the bundled dataset into SQLite
 uvicorn app.main:app --port 8000             # REST API  → http://localhost:8000/docs
 API_URL=http://localhost:8000 streamlit run dashboard/streamlit_app.py --server.port 8501
-python -m pytest                             # 22 tests
+python -m pytest                             # 27 tests
 ```
 
 Or with Docker: `docker compose up --build`. The API runs on `:8000` and the dashboard on `:8501`.
 
 To process real video you also need `pip install -r requirements-pipeline.txt` (Ultralytics YOLO11m/ByteTrack and OpenCV; OSNet through torchreid is optional).
+
+### Train on your own videos (target ≥ 95%)
+See **[`training/README.md`](training/README.md)**. The workflow:
+1. Extract frames, pre-label them with YOLO11x and review the labels.
+2. Build a dataset split by video, so no clip appears in both training and test.
+3. Fine-tune YOLO11m.
+4. Run the pipeline with the new weights.
+5. Score the events against hand-labelled ground truth.
+
+Both reports (detector precision/recall/F1/mAP and event-level F1 and counting accuracy) appear on the dashboard's **Model accuracy** tab against the 95% target.
 
 | Overview | Zones & heatmap |
 |---|---|
@@ -64,6 +74,13 @@ See [`docs/architecture.md`](docs/architecture.md) for the camera processor map,
 
 Tracks present for at least 90% of a clip of 90 s or more (cashier, floor staff) are flagged `is_staff=true` and excluded from the KPIs.
 
+Accuracy safeguards that run before the camera logic:
+- per-camera `exclude_polygons` (posters, mirrors, screens)
+- minimum and maximum box size
+- suppression of static detections (mannequins: never move for ≥ 60 s)
+- door crossings counted only on the door segment, not on the line's extension
+- ByteTrack tuned for 5 fps (`config/bytetrack_store.yaml`, ~12 s occlusion memory)
+
 ```bash
 python -m pipeline.run_pipeline --store-id STORE_BLR_002 --camera CAM3 \
     --video videos/cam3.mp4 --start-time 2026-04-10T20:10:00Z \
@@ -96,6 +113,8 @@ All analytics endpoints take `store_id`, plus an optional `date=YYYY-MM-DD` or `
 | GET | `/insights/hesitation` | Service touch-points: hesitation levels per zone and the recommended staff action |
 | GET | `/insights/shelf` | Attention × conversion quadrant (star / problem / potential / obsolete) |
 | GET | `/forecast?horizon=6` | Footfall forecast (damped Holt, open hours only) and the CCTV+POS fusion regression |
+| GET | `/compare` | Headline KPIs for every store and day |
+| GET | `/evaluation` | Latest detector and event-accuracy reports (`reports/*.json`) |
 
 ---
 
@@ -147,7 +166,10 @@ dashboard/           Streamlit app (HTTP only)
 config/              store_layout.json — zones, camera polygons, floor coords, open hours
 data/                bundled dataset (anonymised)
 scripts/seed_demo.py load everything (direct DB or via API)
-tests/               API, analytics and pipeline unit tests (synthetic tracks, no GPU needed)
+training/            frames → pre-labels → dataset → YOLO11m fine-tune → batch pipeline →
+                     event-accuracy evaluation; ground-truth labelling app
+reports/, models/    accuracy reports and fine-tuned weights (written by training/)
+tests/               API, analytics, pipeline and training unit tests (synthetic tracks, no GPU needed)
 ```
 
 ## Privacy

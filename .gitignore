@@ -12,7 +12,11 @@ venv/
 *.mp4
 *.avi
 *.pt
+!models/.gitkeep
 videos/
 reid_gallery.json
 .DS_Store
 .env
+datasets/
+runs/
+models/*.pt

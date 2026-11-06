@@ -75,7 +75,7 @@ class QueueProcessor(Processor):
             tid = t.track_id
             s = self.q.setdefault(tid, _Q())
             s.last_seen, s.conf = ts, 0.5 * s.conf + 0.5 * t.confidence
-            self._seen(self.vid(tid), ts)
+            self._seen(self.vid(tid), ts, t.bbox)
             s.last_in_q = tid in in_q
             if tid in in_q:
                 s.q_since = s.q_since or ts

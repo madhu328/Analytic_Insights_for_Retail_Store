@@ -82,7 +82,7 @@ class ZoneDwellProcessor(Processor):
         for t in tracks:
             seen.add(t.track_id)
             vid = self._visitor(t)
-            self._seen(vid, ts)
+            self._seen(vid, ts, t.bbox)
             st = self.state.setdefault(t.track_id, _State())
             st.last_seen = ts
             st.confs.append(t.confidence)

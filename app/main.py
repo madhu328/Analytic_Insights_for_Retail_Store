@@ -18,6 +18,9 @@ from .analytics.funnel import compute_funnel
 from .analytics.heatmap import compute_heatmap
 from .analytics.insights import hesitation_insights, journey_insights, shelf_quadrant
 from .analytics.metrics import compute_metrics
+import json
+
+from .config import settings
 from .layout import store_layout
 from .schemas import Event, IngestResult, PosTransaction, validate_batch
 from .service import Analysis, analyse, resolve_window
@@ -179,3 +182,38 @@ def shelf(a: Analysis = Depends(analysis_dep)) -> dict:
 @app.get("/forecast")
 def forecast(a: Analysis = Depends(analysis_dep), horizon: int = Query(6, ge=1, le=48)) -> dict:
     return _envelope(a, **run_forecast(a.hourly, horizon, store_layout(a.store_id).get("open_hours")))
+
+
+@app.get("/evaluation")
+def evaluation() -> dict:
+    """Latest model / pipeline accuracy reports written by the training toolkit."""
+    out = {"target": 0.95}
+    for key, name in (("detector", "detector_metrics.json"), ("events", "event_accuracy.json")):
+        f = settings.reports_dir / name
+        out[key] = json.loads(f.read_text()) if f.exists() else None
+    return out
+
+
+@app.get("/compare")
+def compare(engine: Engine = Depends(get_engine)) -> list[dict]:
+    """Headline KPIs for every store on its most recent day with CCTV activity."""
+    rows = []
+    for s in db.store_summaries(engine):
+        days = s["dates"]
+        if not days:
+            continue
+        ev_days = [d for d in days if s["first_event"] and s["last_event"]
+                   and str(s["first_event"].date()) <= d <= str(s["last_event"].date())] or days
+        for day in ev_days:
+            st, en = resolve_window(date.fromisoformat(day), None, None)
+            a = analyse(engine, s["store_id"], st, en)
+            m = compute_metrics(a.build, a.matches, a.transactions)
+            rows.append({"store_id": s["store_id"], "name": store_layout(s["store_id"]).get("name", s["store_id"]),
+                         "date": day, **{k: m[k] for k in ("visitors", "sessions", "converted_visitors",
+                                                           "conversion_rate", "revenue_inr", "attributed_revenue_inr",
+                                                           "avg_basket_inr", "avg_session_duration_s",
+                                                           "avg_zone_dwell_s")},
+                         "queue_abandonment_rate": m["queue"]["abandonment_rate"],
+                         "max_queue_depth": m["queue"]["max_queue_depth"],
+                         "matched_transactions": m["matched_transactions"], "transactions": m["transactions"]})
+    return rows

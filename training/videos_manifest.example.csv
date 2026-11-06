@@ -1,0 +1,6 @@
+video,store_id,camera,start_time
+videos/store_1/cam3.mp4,STORE_BLR_002,CAM3,2026-04-10T20:10:00Z
+videos/store_1/cam1.mp4,STORE_BLR_002,CAM1,2026-04-10T20:10:00Z
+videos/store_1/cam2.mp4,STORE_BLR_002,CAM2,2026-04-10T20:10:00Z
+videos/store_1/cam5.mp4,STORE_BLR_002,CAM5,2026-04-10T20:10:00Z
+videos/store_2/cam3.mp4,STORE_BLR_003,CAM3,2026-04-10T14:00:00Z

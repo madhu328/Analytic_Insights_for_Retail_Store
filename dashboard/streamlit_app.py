@@ -58,6 +58,24 @@ def inr_short(x: float) -> str:
     return f"₹{x:,.0f}"
 
 
+def table(df: pd.DataFrame, name: str) -> None:
+    """Dataframe + CSV download (every table in the dashboard is exportable)."""
+    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.download_button(f"⬇ {name}.csv", df.to_csv(index=False).encode(), f"{name}.csv", "text/csv",
+                       key=f"dl_{name}")
+
+
+def pct_bar(label: str, value, target: float = 0.95):
+    """Progress-style row for an accuracy figure against the 95% target."""
+    if value is None:
+        st.markdown(f"**{label}** · –")
+        return
+    ok = value >= target
+    st.markdown(f"{'✅' if ok else '⚠️'} **{label}** · {100 * value:.1f}% "
+                f"<span style='color:{MUTED}'>(target {100 * target:.0f}%)</span>", unsafe_allow_html=True)
+    st.progress(min(1.0, float(value)))
+
+
 # ---------------------------------------------------------------- sidebar / filters
 try:
     stores = api("/stores")
@@ -88,7 +106,7 @@ st.caption(f"{store_id} · {day} · open {store.get('open_hours', {}).get('open'
            f"{store.get('open_hours', {}).get('close', '?')} · {m['data_quality']['total_events']} events")
 
 tabs = st.tabs(["Overview", "Zones & heatmap", "Journeys", "Queue & anomalies", "Conversions",
-                "Forecast", "Sessions"])
+                "Forecast", "Sessions", "Store comparison", "Model accuracy"])
 
 # ---------------------------------------------------------------- overview
 with tabs[0]:
@@ -159,7 +177,7 @@ with tabs[1]:
                                        hovertemplate="%{y} @ %{x}: %{z} visits<extra></extra>", xgap=2, ygap=2))
             st.plotly_chart(style(fig.update_layout(title="Zone visits by hour"), max(320, 24 * len(mx["zones"]))),
                             use_container_width=True)
-        st.dataframe(z, use_container_width=True, hide_index=True)
+        table(z, f"zones_{store_id}_{day}")
     q = api("/insights/shelf", **P)
     if q["zones"]:
         qd = pd.DataFrame(q["zones"])
@@ -171,8 +189,8 @@ with tabs[1]:
         fig.add_vline(x=q["thresholds"]["attention_pct"], line_dash="dot", line_color=AXIS)
         fig.add_hline(y=q["thresholds"]["conversion_pct"], line_dash="dot", line_color=AXIS)
         st.plotly_chart(style(fig, 420), use_container_width=True)
-        st.dataframe(qd[["zone_id", "quadrant", "attention_pct", "conversion_pct", "strategy"]],
-                     use_container_width=True, hide_index=True)
+        table(qd[["zone_id", "quadrant", "attention_pct", "conversion_pct", "viewers", "buyers", "strategy"]],
+              f"shelf_quadrant_{store_id}_{day}")
 
 # ---------------------------------------------------------------- journeys
 with tabs[2]:
@@ -196,14 +214,14 @@ with tabs[2]:
         st.plotly_chart(style(fig), use_container_width=True)
     if j["top_flows"]:
         st.subheader("Top zone-to-zone flows")
-        st.dataframe(pd.DataFrame(j["top_flows"]), use_container_width=True, hide_index=True)
+        table(pd.DataFrame(j["top_flows"]), f"zone_flows_{store_id}_{day}")
     hz = api("/insights/hesitation", **P)
     st.subheader("Service touch-points (hesitation signals)")
     st.caption(f"Dwell timeout > {hz['thresholds']['dwell_timeout_s']:.0f}s or zone revisited "
                f"≥ {hz['thresholds']['loiter_revisits']}×. Levels: " +
                " · ".join(f"**{k}**: {v}" for k, v in hz["actions"].items()))
     if hz["zones"]:
-        st.dataframe(pd.DataFrame(hz["zones"]), use_container_width=True, hide_index=True)
+        table(pd.DataFrame(hz["zones"]), f"hesitation_{store_id}_{day}")
 
 # ---------------------------------------------------------------- queue & anomalies
 with tabs[3]:
@@ -232,6 +250,9 @@ with tabs[3]:
                         f"{an['detail']}  \n➡️ _{an['suggested_action']}_")
     if not a["anomalies"]:
         st.success("No anomalies detected for this period.")
+    else:
+        st.download_button("⬇ anomalies.csv", pd.DataFrame(a["anomalies"]).to_csv(index=False).encode(),
+                           f"anomalies_{store_id}_{day}.csv", "text/csv")
 
 # ---------------------------------------------------------------- conversions
 with tabs[4]:
@@ -249,7 +270,7 @@ with tabs[4]:
             fig = px.histogram(cv[matched], x="gap_s", nbins=20, title="Billing activity → POS gap (seconds)",
                                color_discrete_sequence=[SERIES[0]])
             st.plotly_chart(style(fig, 280), use_container_width=True)
-        st.dataframe(cv, use_container_width=True, hide_index=True)
+        table(cv, f"conversions_{store_id}_{day}")
 
 # ---------------------------------------------------------------- forecast
 with tabs[5]:
@@ -287,7 +308,7 @@ with tabs[6]:
     sdf = pd.DataFrame(ss["sessions"])
     st.caption(f"{ss['total']} sessions")
     if not sdf.empty:
-        st.dataframe(sdf, use_container_width=True, hide_index=True)
+        table(sdf.assign(zones=sdf["zones"].map(" → ".join)), f"sessions_{store_id}_{day}")
         pick = st.selectbox("Inspect session", sdf["session_id"])
         d = api(f"/sessions/{pick}", **P)
         zv = pd.DataFrame(d["zone_visits"])
@@ -300,5 +321,69 @@ with tabs[6]:
         if not ev.empty:
             st.dataframe(ev[["timestamp", "event_type", "camera_id", "zone_id", "dwell_ms", "confidence"]],
                          use_container_width=True, hide_index=True)
+
+# ---------------------------------------------------------------- store comparison
+with tabs[7]:
+    cmp_ = pd.DataFrame(api("/compare"))
+    if cmp_.empty:
+        st.info("No stores with data yet.")
+    else:
+        cmp_["store_day"] = cmp_["store_id"] + " · " + cmp_["date"]
+        st.caption("Each store on every day with data. Charts use one measure each (no dual axes).")
+        cols = st.columns(2)
+        for i, (col, title) in enumerate([("visitors", "Visitors"), ("conversion_rate", "Conversion rate (%)"),
+                                          ("revenue_inr", "Revenue (₹)"),
+                                          ("queue_abandonment_rate", "Queue abandonment (%)")]):
+            fig = px.bar(cmp_, x="store_day", y=col, title=title, text=col, color_discrete_sequence=[SERIES[i % 3]])
+            fig.update_traces(texttemplate="%{text:,.4~f}", textposition="outside")
+            fig.update_xaxes(title=None)
+            fig.update_yaxes(title=None)
+            cols[i % 2].plotly_chart(style(fig, 300), use_container_width=True)
+        table(cmp_.drop(columns=["store_day"]), "store_comparison")
+
+# ---------------------------------------------------------------- model accuracy
+with tabs[8]:
+    ev = api("/evaluation")
+    target = ev["target"]
+    det, evr = ev.get("detector"), ev.get("events")
+    st.subheader("Person detector (YOLO11m fine-tuned on store footage)")
+    if det and det.get("test") and "precision" in det["test"]:
+        t = det["test"]
+        st.caption(f"Held-out **test videos** · weights `{t['weights']}` · {t['generated_at']}")
+        c = st.columns(5)
+        for col, k in zip(c, ("precision", "recall", "f1", "map50", "map50_95")):
+            col.metric(k.replace("_", "-").upper() if k.startswith("map") else k.title(), f"{100 * t[k]:.1f}%")
+        for k in ("precision", "recall", "f1", "map50"):
+            pct_bar(k.upper() if k == "map50" else k.title(), t[k], target)
+        if det.get("val") and "precision" in det["val"]:
+            with st.expander("Validation split"):
+                st.json(det["val"])
+    else:
+        st.info("No detector report yet. Train on your videos (see `training/README.md`):\n\n"
+                "`extract_frames → prelabel → review labels → build_dataset → train_detector`\n\n"
+                "The training step writes `reports/detector_metrics.json`, which appears here.")
+    st.subheader("End-to-end event accuracy (pipeline vs hand-labelled ground truth)")
+    if evr:
+        o = evr["overall"]
+        c = st.columns(4)
+        c[0].metric("Event precision", f"{100 * o['precision']:.1f}%")
+        c[1].metric("Event recall", f"{100 * o['recall']:.1f}%")
+        c[2].metric("Event F1", f"{100 * o['f1']:.1f}%")
+        c[3].metric("Labelled events", evr["n_truth"])
+        pct_bar("Overall event F1", o["f1"], target)
+        for k, v in evr["counting_accuracy"].items():
+            pct_bar(f"Counting accuracy · {k.replace('_', ' ')}", v, target)
+        if evr["dwell"]["within_20pct"] is not None:
+            pct_bar("Dwell within ±20%", evr["dwell"]["within_20pct"], target)
+        per = pd.DataFrame([{"event_type": k, **v} for k, v in evr["per_event_type"].items()])
+        fig = px.bar(per, x="event_type", y="f1", title="F1 by event type", color_discrete_sequence=[SERIES[0]],
+                     range_y=[0, 1.05])
+        fig.add_hline(y=target, line_dash="dot", line_color=STATUS["good"], annotation_text="95% target")
+        st.plotly_chart(style(fig, 320), use_container_width=True)
+        table(per, "event_accuracy_by_type")
+    else:
+        st.info("No event-accuracy report yet. Label ground truth with "
+                "`streamlit run training/label_events_app.py -- --videos videos/`, then run "
+                "`python -m training.evaluate_events --pred data/pipeline_outputs --truth training/ground_truth/<store>.csv`.")
 
 st.caption(f"Rendered {datetime.now():%Y-%m-%d %H:%M:%S}")

@@ -31,11 +31,11 @@ class _Door:
 
 
 class EntryExitProcessor(Processor):
-    OPTIONS = Processor.OPTIONS | {"reid", "embedder", "min_frames", "lost_timeout_s"}
+    OPTIONS = Processor.OPTIONS | {"reid", "embedder", "min_frames", "lost_timeout_s", "segment_margin"}
 
     def __init__(self, cam_cfg: dict, emitter, reid: Optional[ReIDManager] = None,
                  embedder: Optional[Embedder] = None, min_frames: int = 2,
-                 lost_timeout_s: float = 3.0, **kw):
+                 lost_timeout_s: float = 3.0, segment_margin: float = 0.15, **kw):
         kw.setdefault("staff_presence_ratio", 0.95)
         super().__init__(cam_cfg, emitter, **kw)
         self.a, self.b = cam_cfg["entry_line"]
@@ -44,6 +44,17 @@ class EntryExitProcessor(Processor):
         self.embedder = embedder
         self.min_frames, self.lost_timeout_s = min_frames, lost_timeout_s
         self.tracks: dict[int, _Door] = {}
+        self.segment_margin = segment_margin
+
+    def within_door(self, bbox) -> bool:
+        """Crossings only count where the feet project onto the door segment (+margin), so
+        people walking past the doorway's extension outside the store are ignored."""
+        px, py = anchor_point(bbox, self.anchor)
+        (ax, ay), (bx, by) = self.a, self.b
+        dx, dy = bx - ax, by - ay
+        L2 = dx * dx + dy * dy or 1e-12
+        u = ((px - ax) * dx + (py - ay) * dy) / L2
+        return -self.segment_margin <= u <= 1 + self.segment_margin
 
     def side(self, bbox) -> str:
         s = side_of_line(anchor_point(bbox, self.anchor), self.a, self.b)
@@ -87,7 +98,7 @@ class EntryExitProcessor(Processor):
             d.last_seen = ts
             d.conf = 0.5 * d.conf + 0.5 * t.confidence
             if d.visitor_id:
-                self._seen(d.visitor_id, ts)
+                self._seen(d.visitor_id, ts, t.bbox)
             area = (t.bbox[2] - t.bbox[0]) * (t.bbox[3] - t.bbox[1])
             if t.crop is not None and area > d.best_area:
                 d.best_crop, d.best_area = t.crop, area
@@ -102,7 +113,8 @@ class EntryExitProcessor(Processor):
                 d.pending, d.pending_n, d.pending_since = s, 0, ts
             d.pending_n += 1
             if d.pending_n >= self.min_frames:
-                self._crossed(t.track_id, d, s, d.pending_since)
+                if self.within_door(t.bbox):
+                    self._crossed(t.track_id, d, s, d.pending_since)
                 d.side, d.pending, d.pending_n = s, None, 0
         for tid, d in list(self.tracks.items()):
             if tid not in seen and d.last_seen and (ts - d.last_seen).total_seconds() > self.lost_timeout_s:

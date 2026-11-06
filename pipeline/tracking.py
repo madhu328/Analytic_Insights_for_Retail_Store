@@ -23,11 +23,16 @@ class Track:
 
 class PersonTracker:
     def __init__(self, model: str = "yolo11m.pt", conf: float = 0.35, iou: float = 0.5,
-                 device: Optional[str] = None, tracker_cfg: str = "bytetrack.yaml",
+                 device: Optional[str] = None, tracker_cfg: Optional[str] = None,
                  imgsz: int = 960):
         from ultralytics import YOLO  # lazy: only needed when processing video
 
+        from pathlib import Path
+
         self.model = YOLO(model)
+        if tracker_cfg is None:
+            tuned = Path(__file__).resolve().parent.parent / "config" / "bytetrack_store.yaml"
+            tracker_cfg = str(tuned) if tuned.exists() else "bytetrack.yaml"
         self.conf, self.iou, self.device, self.tracker_cfg, self.imgsz = conf, iou, device, tracker_cfg, imgsz
 
     def update(self, frame, keep_crops: bool = False) -> list[Track]:

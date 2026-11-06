@@ -106,8 +106,9 @@ def test_staff_flagging_and_jsonl(tmp_path):
     cam = {"camera_id": "CAM_SHELF_02", "anchor": "center", "zones": [{"zone_id": "LAKME", "polygon": SQUARE}]}
     out = tmp_path / "cam2.jsonl"
     p = build_processor({**cam, "processor": "cam2"}, EventEmitter("S", "CAM_SHELF_02", out))
-    frames = [[Track(1, box_at(0.25, 0.25), 0.9)] + ([Track(2, box_at(0.25, 0.3), 0.8)] if 100 < i < 160 else [])
-              for i in range(600)]  # 120 s clip; track 1 present throughout
+    frames = [[Track(1, box_at(0.2 + 0.1 * (i % 50) / 50, 0.25), 0.9)]
+              + ([Track(2, box_at(0.25, 0.3), 0.8)] if 100 < i < 160 else [])
+              for i in range(600)]  # 120 s clip; track 1 (staff) present and moving throughout
     run(p, frames)
     lines = [json.loads(x) for x in out.read_text().splitlines()]
     assert {e["visitor_id"] for e in lines if e["is_staff"]} == {"VIS_1"}
@@ -132,3 +133,28 @@ def test_bundled_events_match_contract():
     for f in files:
         for line in f.read_text().splitlines():
             Event.model_validate_json(line)
+
+
+def test_static_false_positive_is_dropped_and_filters():
+    from pipeline.filters import DetectionFilter
+    cam = {"camera_id": "CAM_SHELF_02", "anchor": "center", "zones": [{"zone_id": "LAKME", "polygon": SQUARE}]}
+    em = EventEmitter("S", "CAM_SHELF_02")
+    p = ZoneDwellProcessor(cam, em, staff_presence_ratio=0)
+    mannequin = Track(3, box_at(0.25, 0.25), 0.7)
+    shopper = lambda i: Track(4, box_at(0.1 + 0.3 * i / 200, 0.25), 0.9)
+    evs = run(p, [[mannequin] + ([shopper(i)] if i < 200 else []) for i in range(400)])  # 80 s
+    assert {e["visitor_id"] for e in evs} == {"VIS_4"}
+    f = DetectionFilter(exclude_polygons=[[[0.6, 0.6], [1, 0.6], [1, 1], [0.6, 1]]])
+    kept = f([Track(1, box_at(0.8, 0.8), 0.9), Track(2, box_at(0.3, 0.3), 0.9), Track(3, (0.1, 0.1, 0.11, 0.11), 0.9)])
+    assert [t.track_id for t in kept] == [2]  # poster region and tiny fragment removed
+
+
+def test_entry_line_ignores_crossings_outside_door_segment():
+    cam = {"camera_id": "CAM_ENTRY_01", "anchor": "bottom_center",
+           "entry_line": [[0.4, 0.5], [0.6, 0.5]], "inside_point": [0.5, 0.1]}
+    em = EventEmitter("S", "CAM_ENTRY_01")
+    p = EntryExitProcessor(cam, em, staff_presence_ratio=0)
+    passer_by = [[Track(1, feet_at(0.95, y), 0.9)] for y in (0.9, 0.7, 0.4, 0.3)]  # beside the door
+    shopper = [[Track(2, feet_at(0.5, y), 0.9)] for y in (0.9, 0.7, 0.4, 0.3)]
+    evs = run(p, passer_by + shopper)
+    assert [(e["event_type"], e["visitor_id"]) for e in evs] == [("ENTRY", "VIS_T2")]
