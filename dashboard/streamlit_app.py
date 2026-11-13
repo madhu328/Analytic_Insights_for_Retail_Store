@@ -15,27 +15,46 @@ import streamlit as st
 
 API = os.getenv("API_URL", "http://localhost:8000").rstrip("/")
 
-# Validated reference palette (dataviz skill): categorical order, sequential blue, status.
-SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
-SEQ_BLUE = ["#cde2fb", "#86b6ef", "#3987e5", "#256abf", "#104281"]
-STATUS = {"critical": "#d03b3b", "warning": "#fab219", "info": "#2a78d6", "good": "#0ca30c"}
+st.set_page_config(page_title="Store Intelligence", page_icon="🛍️", layout="wide")
+
+
+def _is_dark() -> bool:
+    """Server-configured dark theme, or the viewer's active theme (Streamlit >= 1.46)."""
+    if (st.get_option("theme.base") or "") == "dark":
+        return True
+    try:
+        return (st.context.theme.type or "light") == "dark"
+    except Exception:
+        return False
+
+
+DARK = _is_dark()
+# Validated reference palette (dataviz skill), with separate steps for light and dark surfaces.
+if DARK:
+    SERIES = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
+    SEQ_BLUE = ["#184f95", "#256abf", "#3987e5", "#6da7ec", "#b7d3f6"]  # low recedes into the dark surface
+    MUTED = "#898781"
+else:
+    SERIES = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
+    SEQ_BLUE = ["#cde2fb", "#86b6ef", "#3987e5", "#256abf", "#104281"]
+    MUTED = "#898781"
+GRID, AXIS = "rgba(137,135,129,0.22)", "rgba(137,135,129,0.45)"  # recede on light and dark alike
+STATUS = {"critical": "#d03b3b", "warning": "#fab219", "info": SERIES[0], "good": "#0ca30c"}
 ICON = {"critical": "🔴", "warning": "🟠", "info": "🔵"}
-GRID, AXIS, MUTED = "#e1e0d9", "#c3c2b7", "#898781"
+LEVEL_ICON = {"critical": "🚨", "warning": "⚠️", "info": "💡", "good": "✅"}
 ZONE_CLASS_COLOR = {"hot": SERIES[1], "warm": SERIES[3], "cold": SERIES[0]}
 QUADRANT_COLOR = {"star": SERIES[0], "problem": SERIES[1], "potential": SERIES[2], "obsolete": MUTED}
-
-st.set_page_config(page_title="Store Intelligence", page_icon="🛍️", layout="wide")
 
 
 def style(fig: go.Figure, height: int = 340) -> go.Figure:
     fig.update_layout(height=height, margin=dict(l=8, r=8, t=48, b=8), plot_bgcolor="rgba(0,0,0,0)",
-                      paper_bgcolor="rgba(0,0,0,0)", hoverlabel=dict(bgcolor="white"),
+                      paper_bgcolor="rgba(0,0,0,0)",
                       legend=dict(orientation="h", yanchor="top", y=-0.18, x=0, title=None),
-                      font=dict(size=13))
-    fig.update_xaxes(showgrid=False, linecolor=AXIS, title_font_color=MUTED)
+                      font=dict(size=13))  # text colours follow the Streamlit theme
+    fig.update_xaxes(showgrid=False, linecolor=AXIS, title_font_color=MUTED, tickfont_color=MUTED)
     if fig.layout.xaxis.title.text in ("hour", None):  # time axes are self-explanatory
         fig.update_xaxes(title=None)
-    fig.update_yaxes(gridcolor=GRID, zeroline=False, linecolor=AXIS, title_font_color=MUTED)
+    fig.update_yaxes(gridcolor=GRID, zeroline=False, linecolor=AXIS, title_font_color=MUTED, tickfont_color=MUTED)
     return fig
 
 
@@ -87,70 +106,176 @@ if not stores:
     st.stop()
 
 st.sidebar.title("🛍️ Store Intelligence")
-labels = {s["store_id"]: f"{s.get('name', s['store_id'])} · {s['store_id']}" for s in stores}
+labels = {s["store_id"]: s.get("name", s["store_id"]) for s in stores}
 store_id = st.sidebar.selectbox("Store", list(labels), format_func=labels.get)
+st.sidebar.caption(f"ID: `{store_id}`")
 store = next(s for s in stores if s["store_id"] == store_id)
 dates = store["dates"] or [None]
-day = st.sidebar.selectbox("Date", dates[::-1])
+day = st.sidebar.selectbox("Date", dates[::-1],
+                           format_func=lambda d: f"{pd.Timestamp(d):%a, %d %b %Y}" if d else "All")
 with st.sidebar.expander("POS match window"):
     wb = st.slider("Minutes before POS", 1, 15, 5)
     wa = st.slider("Grace after POS", 0, 5, 1)
 if st.sidebar.button("↻ Refresh"):
     st.cache_data.clear()
-st.sidebar.caption(f"API: {API}")
+with st.sidebar.expander("📖 How to read this dashboard"):
+    st.markdown("""
+- **Visitors**: unique people who entered (a person who leaves and comes back counts once).
+- **Sessions**: individual visits, re-entries included.
+- **Converted**: visitors whose billing-counter activity matched a POS bill within 5 minutes.
+- **Conversion rate**: converted ÷ visitors.
+- **Attributed revenue**: the part of POS revenue linked to a tracked visitor.
+- **Dwell**: time spent in front of a shelf zone.
+- **Queue abandonment**: shoppers who joined the billing queue and left without paying.
+- **Hot / warm / cold zone**: high traffic with long dwell / medium / low or no traffic.
+- **PCI (path complexity)**: 1 = direct path; higher = more wandering.
+- **Hesitation**: lingering > 60 s or returning to the same shelf; a cue for staff help.
+- **Data health**: how far the camera and POS feeds can be trusted for the period.
+""")
+with st.sidebar.expander("⚙️ About"):
+    st.caption(f"API: {API}")
+    st.caption("Analytics are rebuilt from raw events on every request.")
 P = {"store_id": store_id, "date": day, "window_before_min": wb, "window_after_min": wa}
 
 m = api("/metrics", **P)
+summ = api("/insights/summary", **P)
+oh = store.get("open_hours") or {}
 st.title(store.get("name", store_id))
-st.caption(f"{store_id} · {day} · open {store.get('open_hours', {}).get('open', '?')}–"
-           f"{store.get('open_hours', {}).get('close', '?')} · {m['data_quality']['total_events']} events")
+st.caption(f"{pd.Timestamp(day):%A, %d %B %Y} · open {oh.get('open', '?')}–{oh.get('close', '?')} · "
+           f"{m['data_quality']['total_events']:,} camera events · {m['transactions']} POS bills" if day else store_id)
 
 tabs = st.tabs(["Overview", "Zones & heatmap", "Journeys", "Queue & anomalies", "Conversions",
                 "Forecast", "Sessions", "Store comparison", "Model accuracy"])
 
+
+def benchmark() -> dict:
+    """Average of every *other* store-day with footfall, used as the KPI comparison baseline."""
+    try:
+        rows = [r for r in api("/compare") if r["visitors"] and not (r["store_id"] == store_id and r["date"] == day)]
+    except requests.RequestException:
+        rows = []
+    if not rows:
+        return {}
+    keys = ("visitors", "conversion_rate", "revenue_inr", "avg_basket_inr", "avg_session_duration_s",
+            "avg_zone_dwell_s", "queue_abandonment_rate")
+    return {k: sum(r[k] for r in rows) / len(rows) for k in keys} | {"n": len(rows)}
+
+
+def delta(cur, key, bench, fmt="{:+.0f}", pct=False):
+    if not bench or key not in bench or not bench[key]:
+        return None
+    d = cur - bench[key]
+    return (fmt.format(d) + (" pts" if pct else "")) + " vs avg"
+
+
+def insight_card(i: dict) -> None:
+    with st.container(border=True):
+        st.markdown(f"{LEVEL_ICON[i['level']]} **{i['title']}**  \n{i['detail']}"
+                    + (f"  \n➡️ *{i['action']}*" if i.get("action") else ""))
+
+
 # ---------------------------------------------------------------- overview
 with tabs[0]:
-    c = st.columns(6)
-    c[0].metric("Visitors", m["visitors"], help="Unique people (re-entries counted once)")
-    c[1].metric("Sessions", m["sessions"], f"{m['reentry_sessions']} re-entries", delta_color="off")
-    c[2].metric("Converted", m["converted_visitors"])
-    c[3].metric("Conversion rate", f"{m['conversion_rate']}%")
-    c[4].metric("Revenue", inr_short(m["revenue_inr"]),
-                f"{100 * m['attributed_revenue_inr'] / (m['revenue_inr'] or 1):.0f}% attributed", delta_color="off",
-                help=f"{inr(m['revenue_inr'])} total POS · {inr(m['attributed_revenue_inr'])} matched to CCTV visitors")
-    c[5].metric("Avg basket", inr_short(m["avg_basket_inr"]), help=inr(m["avg_basket_inr"]))
-    c = st.columns(6)
-    c[0].metric("Avg visit", f"{m['avg_session_duration_s'] / 60:.1f} min")
-    c[1].metric("Avg zone dwell", f"{m['avg_zone_dwell_s']:.0f} s")
-    c[2].metric("Zones / visit", m["avg_zones_per_session"])
-    c[3].metric("Queue joins", m["queue"]["joins"])
-    c[4].metric("Queue abandonment", f"{m['queue']['abandonment_rate']}%")
-    c[5].metric("Avg wait to pay", f"{m['queue']['avg_wait_to_pay_s'] / 60:.1f} min")
+    # -- key insights: the story first, numbers second
+    st.subheader("Key insights")
+    ins = summ["insights"]
+    cols = st.columns(2)
+    for k, i in enumerate(ins[:6]):
+        with cols[k % 2]:
+            insight_card(i)
+    if len(ins) > 6:
+        with st.expander(f"Show {len(ins) - 6} more insights"):
+            cols = st.columns(2)
+            for k, i in enumerate(ins[6:]):
+                with cols[k % 2]:
+                    insight_card(i)
 
+    # -- KPIs with context
+    bench = benchmark()
+    st.subheader("Today's numbers")
+    if bench:
+        st.caption(f"Arrows compare with the average of {bench['n']} other store-day(s) in the system.")
+    c = st.columns(6)
+    c[0].metric("Visitors", m["visitors"], delta(m["visitors"], "visitors", bench),
+                help="Unique people who entered. Someone who leaves and comes back counts once.")
+    c[1].metric("Sessions", m["sessions"], f"{m['reentry_sessions']} re-entries", delta_color="off",
+                help="Individual visits, including re-entries.")
+    c[2].metric("Converted", m["converted_visitors"],
+                help="Visitors whose billing activity matched a POS bill within the match window.")
+    c[3].metric("Conversion rate", f"{m['conversion_rate']}%",
+                delta(m["conversion_rate"], "conversion_rate", bench, "{:+.1f}", pct=True),
+                help="Converted visitors ÷ visitors.")
+    c[4].metric("Revenue", inr_short(m["revenue_inr"]),
+                f"{100 * m['attributed_revenue_inr'] / (m['revenue_inr'] or 1):.0f}% linked to visitors",
+                delta_color="off",
+                help=f"{inr(m['revenue_inr'])} total POS revenue; {inr(m['attributed_revenue_inr'])} "
+                     "is linked to tracked visitors.")
+    c[5].metric("Avg basket", inr_short(m["avg_basket_inr"]),
+                delta(m["avg_basket_inr"], "avg_basket_inr", bench, "₹{:+,.0f}"),
+                help=f"Average bill value: {inr(m['avg_basket_inr'])}")
+    c = st.columns(6)
+    c[0].metric("Avg visit", f"{m['avg_session_duration_s'] / 60:.1f} min",
+                delta(m["avg_session_duration_s"] / 60, "avg_visit_min",
+                      {"avg_visit_min": bench.get("avg_session_duration_s", 0) / 60} if bench else {}, "{:+.1f} min"),
+                help="Average time from entry to exit.")
+    c[1].metric("Avg zone dwell", f"{m['avg_zone_dwell_s']:.0f} s",
+                delta(m["avg_zone_dwell_s"], "avg_zone_dwell_s", bench, "{:+.0f} s"),
+                help="Average time a shopper spends in front of one shelf zone.")
+    c[2].metric("Zones / visit", m["avg_zones_per_session"], help="Distinct shelf zones visited per visit.")
+    c[3].metric("Queue joins", m["queue"]["joins"], help="Times a shopper joined the billing queue.")
+    c[4].metric("Queue abandonment", f"{m['queue']['abandonment_rate']}%",
+                delta(m["queue"]["abandonment_rate"], "queue_abandonment_rate", bench, "{:+.1f}", pct=True),
+                delta_color="inverse", help="Share of queue joins that left without paying. Lower is better.")
+    c[5].metric("Avg wait to pay", f"{m['queue']['avg_wait_to_pay_s'] / 60:.1f} min",
+                help="Average time from joining the queue to the matched POS bill.")
+
+    # -- funnel + hourly traffic
     left, right = st.columns([1, 1])
     with left:
-        level = st.radio("Funnel level", ["visitor", "session"], horizontal=True)
+        st.markdown("**Conversion funnel**")
+        level = st.radio("Count", ["visitor", "session"], horizontal=True, label_visibility="collapsed",
+                         format_func={"visitor": "Unique visitors", "session": "All visits"}.get)
         f = pd.DataFrame(api("/funnel", **P, level=level)["stages"])
         fig = go.Figure(go.Funnel(y=f["stage"], x=f["count"], textinfo="value+percent initial",
-                                  marker=dict(color=SERIES[0]), connector=dict(fillcolor=GRID),
-                                  customdata=f["description"],
+                                  marker=dict(color=SERIES[0]), connector=dict(fillcolor=GRID, line=dict(width=0)),
+                                  textfont=dict(color="#ffffff"), customdata=f["description"],
                                   hovertemplate="%{y}: %{x}<br>%{customdata}<extra></extra>"))
-        st.plotly_chart(style(fig.update_layout(title="Conversion funnel")), use_container_width=True)
+        st.plotly_chart(style(fig, 320).update_layout(margin=dict(t=8)), use_container_width=True)
+        lost = [f"**−{r.drop_off_from_prev}** {f.stage[i - 1]}→{r.stage}" for i, r in f.iterrows()
+                if i and r.drop_off_from_prev]
+        if lost:
+            st.caption("Shoppers lost at each step: " + " · ".join(lost))
     ts = pd.DataFrame(api("/timeseries", **P)["hourly"])
     with right:
+        st.markdown("**Shoppers entering per hour**")
         if not ts.empty:
             ts["hour"] = pd.to_datetime(ts["hour"])
-            fig = px.line(ts, x="hour", y="entries", markers=True, title="Hourly entries",
-                          color_discrete_sequence=[SERIES[0]])
+            pk = ts.loc[ts["entries"].idxmax()]
+            fig = px.line(ts, x="hour", y="entries", markers=True, color_discrete_sequence=[SERIES[0]],
+                          labels={"entries": "shoppers"})
             fig.update_traces(line_width=2, marker_size=8)
-            st.plotly_chart(style(fig), use_container_width=True)
+            fig.add_annotation(x=pk["hour"], y=pk["entries"], text=f"Peak {pk['hour']:%H:00} · {int(pk['entries'])}",
+                               showarrow=True, arrowcolor=MUTED, yshift=6)
+            st.plotly_chart(style(fig, 320).update_layout(margin=dict(t=8)), use_container_width=True)
+            st.caption("Use the peak to plan staff breaks and extra billing counters.")
     if not ts.empty:
-        fig = px.bar(ts, x="hour", y="revenue_inr", title="Hourly POS revenue (₹)",
-                     color_discrete_sequence=[SERIES[2]], labels={"revenue_inr": "Revenue ₹"})
-        st.plotly_chart(style(fig, 280), use_container_width=True)
-    dq = m["data_quality"]
-    with st.expander("Data quality"):
-        st.json(dq)
+        st.markdown("**POS revenue per hour (₹)**")
+        fig = px.bar(ts, x="hour", y="revenue_inr", color_discrete_sequence=[SERIES[2]],
+                     labels={"revenue_inr": "₹"}, hover_data={"transactions": True, "conversions": True})
+        st.plotly_chart(style(fig, 260).update_layout(margin=dict(t=8)), use_container_width=True)
+
+    # -- data health instead of raw JSON
+    h = summ["health"]
+    st.subheader("Data health")
+    hc = st.columns([1, 3])
+    hc[0].metric("Health score", f"{h['score']}/100", h["grade"],
+                 delta_color="normal" if h["score"] >= 85 else "off" if h["score"] >= 60 else "inverse",
+                 help="How far this period's camera and POS data can be trusted.")
+    with hc[1]:
+        for chk in h["checks"]:
+            st.markdown(f"{'✅' if chk['ok'] else '⚠️'} **{chk['check']}** · {chk['detail']}")
+    with st.expander("Technical details"):
+        st.json(m["data_quality"])
 
 # ---------------------------------------------------------------- zones
 with tabs[1]:

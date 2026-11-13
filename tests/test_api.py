@@ -59,3 +59,20 @@ def test_same_transaction_id_in_two_stores(client):
     t = tx("TXN_0001", 1, 10.0)
     r = client.post("/pos/ingest", json=[t, {**t, "store_id": "STORE_BLR_003"}]).json()
     assert r["inserted"] == 2
+
+
+def test_summary_insights_and_health(client):
+    seed(client)
+    r = client.get("/insights/summary", params=P).json()
+    assert r["headline"] == "66.7% of visitors bought something"
+    titles = [i["title"] for i in r["insights"]]
+    assert any(t.startswith("Biggest drop-off") for t in titles)
+    assert all(i["level"] in {"critical", "warning", "info", "good"} for i in r["insights"])
+    assert 0 <= r["health"]["score"] <= 100 and r["health"]["checks"]
+
+
+def test_summary_flags_unreliable_data(client):
+    client.post("/events/ingest", json=[ev("V1", "ENTRY", 0)])
+    client.post("/pos/ingest", json=[tx(f"T{i}", 30 + i, 100.0) for i in range(5)])
+    r = client.get("/insights/summary", params=P).json()
+    assert r["health"]["score"] < 60 and r["insights"][0]["title"] == "Treat these numbers with caution"

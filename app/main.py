@@ -18,6 +18,7 @@ from .analytics.funnel import compute_funnel
 from .analytics.heatmap import compute_heatmap
 from .analytics.insights import hesitation_insights, journey_insights, shelf_quadrant
 from .analytics.metrics import compute_metrics
+from .analytics.summary import build_summary
 import json
 
 from .config import settings
@@ -128,6 +129,15 @@ def anomalies(a: Analysis = Depends(analysis_dep)) -> dict:
     items = detect_anomalies(a.build, a.matches, a.transactions, a.hourly, a.events, a.store_id)
     counts = {k: sum(1 for x in items if x["severity"] == k) for k in ("critical", "warning", "info")}
     return _envelope(a, counts=counts, anomalies=items)
+
+
+@app.get("/insights/summary")
+def summary(a: Analysis = Depends(analysis_dep)) -> dict:
+    """Plain-English key findings, recommended actions and a data-health score."""
+    anomalies_ = detect_anomalies(a.build, a.matches, a.transactions, a.hourly, a.events, a.store_id)
+    out = build_summary(a, anomalies_)
+    out.pop("metrics", None)
+    return _envelope(a, **out)
 
 
 @app.get("/timeseries")

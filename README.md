@@ -16,7 +16,7 @@ pip install -r requirements.txt
 python scripts/seed_demo.py --reset          # loads the bundled dataset into SQLite
 uvicorn app.main:app --port 8000             # REST API  → http://localhost:8000/docs
 API_URL=http://localhost:8000 streamlit run dashboard/streamlit_app.py --server.port 8501
-python -m pytest                             # 27 tests
+python -m pytest                             # 29 tests
 ```
 
 Or with Docker: `docker compose up --build`. The API runs on `:8000` and the dashboard on `:8501`.
@@ -32,6 +32,8 @@ See **[`training/README.md`](training/README.md)**. The workflow:
 5. Score the events against hand-labelled ground truth.
 
 Both reports (detector precision/recall/F1/mAP and event-level F1 and counting accuracy) appear on the dashboard's **Model accuracy** tab against the 95% target.
+
+The Overview tab opens with **Key insights**: plain-English findings, each with a recommended action. Below them are the KPIs compared with the average of other store-days, a funnel showing shoppers lost at each step, and a data-health score. Charts adapt to light and dark mode, and every table can be exported to CSV.
 
 | Overview | Zones & heatmap |
 |---|---|
@@ -109,6 +111,7 @@ All analytics endpoints take `store_id`, plus an optional `date=YYYY-MM-DD` or `
 | GET | `/timeseries` | Hourly entries, queue, revenue and conversion |
 | GET | `/sessions`, `/sessions/{id}` | Session list and full journey with raw events |
 | GET | `/conversions` | POS ↔ session matches with gap and confidence |
+| GET | `/insights/summary` | Plain-English key insights with recommended actions, plus a data-health score (0–100) |
 | GET | `/insights/journeys` | Path Complexity Index, shopper segments, top zone-to-zone flows |
 | GET | `/insights/hesitation` | Service touch-points: hesitation levels per zone and the recommended staff action |
 | GET | `/insights/shelf` | Attention × conversion quadrant (star / problem / potential / obsolete) |
