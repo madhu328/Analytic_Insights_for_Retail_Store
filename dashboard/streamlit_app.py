@@ -79,7 +79,7 @@ def inr_short(x: float) -> str:
 
 def table(df: pd.DataFrame, name: str) -> None:
     """Dataframe + CSV download (every table in the dashboard is exportable)."""
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
     st.download_button(f"⬇ {name}.csv", df.to_csv(index=False).encode(), f"{name}.csv", "text/csv",
                        key=f"dl_{name}")
 
@@ -240,7 +240,7 @@ with tabs[0]:
                                   marker=dict(color=SERIES[0]), connector=dict(fillcolor=GRID, line=dict(width=0)),
                                   textfont=dict(color="#ffffff"), customdata=f["description"],
                                   hovertemplate="%{y}: %{x}<br>%{customdata}<extra></extra>"))
-        st.plotly_chart(style(fig, 320).update_layout(margin=dict(t=8)), use_container_width=True)
+        st.plotly_chart(style(fig, 320).update_layout(margin=dict(t=8)), width="stretch")
         lost = [f"**−{r.drop_off_from_prev}** {f.stage[i - 1]}→{r.stage}" for i, r in f.iterrows()
                 if i and r.drop_off_from_prev]
         if lost:
@@ -256,13 +256,13 @@ with tabs[0]:
             fig.update_traces(line_width=2, marker_size=8)
             fig.add_annotation(x=pk["hour"], y=pk["entries"], text=f"Peak {pk['hour']:%H:00} · {int(pk['entries'])}",
                                showarrow=True, arrowcolor=MUTED, yshift=6)
-            st.plotly_chart(style(fig, 320).update_layout(margin=dict(t=8)), use_container_width=True)
+            st.plotly_chart(style(fig, 320).update_layout(margin=dict(t=8)), width="stretch")
             st.caption("Use the peak to plan staff breaks and extra billing counters.")
     if not ts.empty:
         st.markdown("**POS revenue per hour (₹)**")
         fig = px.bar(ts, x="hour", y="revenue_inr", color_discrete_sequence=[SERIES[2]],
                      labels={"revenue_inr": "₹"}, hover_data={"transactions": True, "conversions": True})
-        st.plotly_chart(style(fig, 260).update_layout(margin=dict(t=8)), use_container_width=True)
+        st.plotly_chart(style(fig, 260).update_layout(margin=dict(t=8)), width="stretch")
 
     # -- data health instead of raw JSON
     h = summ["health"]
@@ -294,14 +294,14 @@ with tabs[1]:
                      hover_data=["visits", "unique_visitors", "avg_dwell_s", "traffic_share_pct"],
                      title="Zone engagement score (0–100)", labels={"engagement_score": "score", "zone_id": ""})
         fig.update_yaxes(categoryorder="total ascending")
-        st.plotly_chart(style(fig, max(340, 26 * len(z))), use_container_width=True)
+        st.plotly_chart(style(fig, max(340, 26 * len(z))), width="stretch")
         mx = h["hour_zone_matrix"]
         if mx["hours"]:
             fig = go.Figure(go.Heatmap(z=mx["values"], x=[f"{x:02d}:00" for x in mx["hours"]], y=mx["zones"],
                                        colorscale=[[i / 4, c] for i, c in enumerate(SEQ_BLUE)],
                                        hovertemplate="%{y} @ %{x}: %{z} visits<extra></extra>", xgap=2, ygap=2))
             st.plotly_chart(style(fig.update_layout(title="Zone visits by hour"), max(320, 24 * len(mx["zones"]))),
-                            use_container_width=True)
+                            width="stretch")
         table(z, f"zones_{store_id}_{day}")
     q = api("/insights/shelf", **P)
     if q["zones"]:
@@ -313,7 +313,7 @@ with tabs[1]:
         fig.update_traces(marker_size=11, textposition="top center", textfont_color=MUTED)
         fig.add_vline(x=q["thresholds"]["attention_pct"], line_dash="dot", line_color=AXIS)
         fig.add_hline(y=q["thresholds"]["conversion_pct"], line_dash="dot", line_color=AXIS)
-        st.plotly_chart(style(fig, 420), use_container_width=True)
+        st.plotly_chart(style(fig, 420), width="stretch")
         table(qd[["zone_id", "quadrant", "attention_pct", "conversion_pct", "viewers", "buyers", "strategy"]],
               f"shelf_quadrant_{store_id}_{day}")
 
@@ -332,11 +332,11 @@ with tabs[2]:
         fig = px.bar(seg, x="segment", y="sessions", title="Shopper segments by PCI", text="share_pct",
                      color_discrete_sequence=[SERIES[0]])
         fig.update_traces(texttemplate="%{text}%")
-        st.plotly_chart(style(fig), use_container_width=True)
+        st.plotly_chart(style(fig), width="stretch")
     with r:
         fig = px.bar(seg, x="segment", y="conversion_rate", title="Conversion rate by segment (%)",
                      color_discrete_sequence=[SERIES[2]])
-        st.plotly_chart(style(fig), use_container_width=True)
+        st.plotly_chart(style(fig), width="stretch")
     if j["top_flows"]:
         st.subheader("Top zone-to-zone flows")
         table(pd.DataFrame(j["top_flows"]), f"zone_flows_{store_id}_{day}")
@@ -360,13 +360,13 @@ with tabs[3]:
             fig = px.line(ts, x="hour", y="max_queue_depth", markers=True, title="Peak queue depth per hour",
                           color_discrete_sequence=[SERIES[1]])
             fig.add_hline(y=8, line_dash="dot", line_color=STATUS["critical"], annotation_text="alert threshold")
-            st.plotly_chart(style(fig), use_container_width=True)
+            st.plotly_chart(style(fig), width="stretch")
         with r:
             qd = ts.melt(id_vars="hour", value_vars=["queue_joins", "queue_abandons"], var_name="event",
                          value_name="count")
             fig = px.bar(qd, x="hour", y="count", color="event", barmode="group", title="Queue joins vs abandons",
                          color_discrete_sequence=[SERIES[0], SERIES[1]])
-            st.plotly_chart(style(fig), use_container_width=True)
+            st.plotly_chart(style(fig), width="stretch")
     for an in a["anomalies"]:
         when = f" · {an['timestamp'][:16].replace('T', ' ')}" if an.get("timestamp") else ""
         zone = f" · {an['zone_id']}" if an.get("zone_id") else ""
@@ -394,7 +394,7 @@ with tabs[4]:
         if matched.any():
             fig = px.histogram(cv[matched], x="gap_s", nbins=20, title="Billing activity → POS gap (seconds)",
                                color_discrete_sequence=[SERIES[0]])
-            st.plotly_chart(style(fig, 280), use_container_width=True)
+            st.plotly_chart(style(fig, 280), width="stretch")
         table(cv, f"conversions_{store_id}_{day}")
 
 # ---------------------------------------------------------------- forecast
@@ -414,7 +414,7 @@ with tabs[5]:
         fig.add_trace(go.Scatter(x=fut["hour"], y=fut["entries"], name="Forecast (open hours)", mode="lines+markers",
                                  line=dict(color=SERIES[1], width=2, dash="dash"), marker=dict(size=8)))
         st.plotly_chart(style(fig.update_layout(title=f"Footfall forecast · {fc['method']}"), 380),
-                        use_container_width=True)
+                        width="stretch")
         st.caption(f"In-sample MAE: {fc['in_sample_mae']} entries/hour")
         fm = fc.get("fusion_model")
         if fm:
@@ -423,7 +423,7 @@ with tabs[5]:
                         f"**R² = {fm['r2']}** _(small sample; indicative only)_")
             coef = pd.DataFrame(fm["standardised_coefficients"].items(), columns=["signal", "₹ per 1 σ"])
             fig = px.bar(coef, x="₹ per 1 σ", y="signal", orientation="h", color_discrete_sequence=[SERIES[2]])
-            st.plotly_chart(style(fig, 220), use_container_width=True)
+            st.plotly_chart(style(fig, 220), width="stretch")
 
 # ---------------------------------------------------------------- sessions
 with tabs[6]:
@@ -441,11 +441,11 @@ with tabs[6]:
             zv["exit"] = zv["exit"].fillna(zv["enter"])
             fig = px.timeline(zv, x_start="enter", x_end="exit", y="zone_id", title=f"Journey of {pick}",
                               color_discrete_sequence=[SERIES[0]], hover_data=["dwell_s"])
-            st.plotly_chart(style(fig, 260), use_container_width=True)
+            st.plotly_chart(style(fig, 260), width="stretch")
         ev = pd.DataFrame(d["events"])
         if not ev.empty:
             st.dataframe(ev[["timestamp", "event_type", "camera_id", "zone_id", "dwell_ms", "confidence"]],
-                         use_container_width=True, hide_index=True)
+                         width="stretch", hide_index=True)
 
 # ---------------------------------------------------------------- store comparison
 with tabs[7]:
@@ -463,7 +463,7 @@ with tabs[7]:
             fig.update_traces(texttemplate="%{text:,.4~f}", textposition="outside")
             fig.update_xaxes(title=None)
             fig.update_yaxes(title=None)
-            cols[i % 2].plotly_chart(style(fig, 300), use_container_width=True)
+            cols[i % 2].plotly_chart(style(fig, 300), width="stretch")
         table(cmp_.drop(columns=["store_day"]), "store_comparison")
 
 # ---------------------------------------------------------------- model accuracy
@@ -504,7 +504,7 @@ with tabs[8]:
         fig = px.bar(per, x="event_type", y="f1", title="F1 by event type", color_discrete_sequence=[SERIES[0]],
                      range_y=[0, 1.05])
         fig.add_hline(y=target, line_dash="dot", line_color=STATUS["good"], annotation_text="95% target")
-        st.plotly_chart(style(fig, 320), use_container_width=True)
+        st.plotly_chart(style(fig, 320), width="stretch")
         table(per, "event_accuracy_by_type")
     else:
         st.info("No event-accuracy report yet. Label ground truth with "

@@ -66,7 +66,7 @@ if ok:
     if "entry_line" in cam:
         (ax, ay), (bx, by) = cam["entry_line"]
         cv2.line(frame, (int(ax * w), int(ay * h)), (int(bx * w), int(by * h)), (0, 0, 255), 3)
-    st.image(frame[:, :, ::-1], use_container_width=True)
+    st.image(frame[:, :, ::-1], width="stretch")
 
 ts = datetime.fromisoformat(start) + timedelta(seconds=sec)
 zones = [z["zone_id"] for z in cam.get("zones", [])] + [cam[k]["zone_id"] for k in ("queue_polygon", "payment_polygon") if k in cam]
@@ -84,4 +84,4 @@ if st.button(f"➕ Add {etype} at {ts:%H:%M:%S.%f}"[:-3]):
         wr.writerow([store_id, cam["camera_id"], etype, ts.isoformat() + "Z", zone, dwell])
     st.success("saved")
 if out.exists():
-    st.dataframe(list(csv.DictReader(out.open())), use_container_width=True)
+    st.dataframe(list(csv.DictReader(out.open())), width="stretch")
