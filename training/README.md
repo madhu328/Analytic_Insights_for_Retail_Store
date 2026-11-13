@@ -7,6 +7,9 @@ videos ─▶ 1 extract_frames ─▶ 2 prelabel (YOLO11x) ─▶ review in CVAT
        ─▶ 4 train_detector (YOLO11m fine-tune) ─▶ 5 batch_process (pipeline) ─▶ 6 evaluate_events (vs ground truth)
 ```
 
+> **No GPU on your laptop?** Use the ready-made Google Colab notebook. It runs steps 2–5 on a free GPU from videos you put in Google Drive:
+> [Open training/colab_train.ipynb in Colab](https://colab.research.google.com/github/madhu328/Analytic_Insights_for_Retail_Store/blob/main/training/colab_train.ipynb)
+
 Install once: `pip install -r requirements-pipeline.txt`. A GPU is strongly recommended for step 4; free Colab or Kaggle T4 notebooks work.
 
 ## 1. Put the videos in place

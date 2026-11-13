@@ -24,7 +24,7 @@ Or with Docker: `docker compose up --build`. The API runs on `:8000` and the das
 To process real video you also need `pip install -r requirements-pipeline.txt` (Ultralytics YOLO11m/ByteTrack and OpenCV; OSNet through torchreid is optional).
 
 ### Train on your own videos (target ≥ 95%)
-See **[`training/README.md`](training/README.md)**. The workflow:
+See **[`training/README.md`](training/README.md)**, or train on a free GPU with the **[Colab notebook](https://colab.research.google.com/github/madhu328/Analytic_Insights_for_Retail_Store/blob/main/training/colab_train.ipynb)**. The workflow:
 1. Extract frames, pre-label them with YOLO11x and review the labels.
 2. Build a dataset split by video, so no clip appears in both training and test.
 3. Fine-tune YOLO11m.
