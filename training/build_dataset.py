@@ -13,6 +13,8 @@ from __future__ import annotations
 import argparse
 import random
 import shutil
+import json
+from training.audit_dataset import audit
 from collections import defaultdict
 from pathlib import Path
 
@@ -41,6 +43,10 @@ def build(images: Path, labels: Path, out: Path, val: float = 0.15, test: float 
     by_group = defaultdict(list)
     for p in imgs:
         by_group[group_of(p)].append(p)
+    if not (0 <= val < 1 and 0 <= test < 1 and val + test < 1):
+        raise ValueError("val and test must be non-negative and sum to less than 1")
+    if (val > 0 or test > 0) and len(by_group) < 3:
+        raise ValueError("At least three source-video groups are required for held-out splits")
     assign = split_groups(list(by_group), val, test, seed)
     stats = {s: {"images": 0, "boxes": 0, "negatives": 0, "videos": 0} for s in ("train", "val", "test")}
     for grp, files in by_group.items():
@@ -61,6 +67,10 @@ def build(images: Path, labels: Path, out: Path, val: float = 0.15, test: float 
             stats[split]["images"] += 1
             stats[split]["boxes"] += nb
             stats[split]["negatives"] += nb == 0
+    (out / "dataset_manifest.json").write_text(json.dumps({
+        "seed": seed, "val_fraction": val, "test_fraction": test,
+        "source_video_splits": assign, "statistics": stats
+    }, indent=2) + "\n")
     (out / "data.yaml").write_text(
         f"path: {out.resolve()}\ntrain: images/train\nval: images/val\ntest: images/test\n"
         "names:\n  0: person\n")
@@ -77,6 +87,9 @@ def main(argv=None):
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--symlink", action="store_true")
     args = ap.parse_args(argv)
+    validation = audit(Path(args.images), Path(args.labels))
+    if not validation["valid"]:
+        raise SystemExit("Dataset failed annotation audit. Run python -m training.audit_dataset for details.")
     stats = build(Path(args.images), Path(args.labels), Path(args.out), args.val, args.test, args.seed,
                   copy=not args.symlink)
     for k, v in stats.items():

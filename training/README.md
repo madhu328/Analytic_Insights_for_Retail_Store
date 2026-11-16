@@ -36,11 +36,21 @@ Import `images/` and `labels/` into **CVAT** or **Label Studio** using the YOLO 
 
 Export back as YOLO txt into `datasets/raw/labels/`.
 
-## 4. Build a leakage-free dataset
+## 4. Validate annotations before building a dataset
+Before creating train/validation/test splits, audit the dataset:
+```bash
+python -m training.audit_dataset --images datasets/raw/images --labels datasets/raw/labels --report reports/dataset_audit.json
+```
+Every sampled image must have a YOLO txt file, including an **empty** txt file for
+a verified image containing no people. A missing label is **not** automatically a negative.
+Review every predicted label before model training. This tool checks annotation
+geometry and missing files; it does not substitute for visual human review.
+
+## 5. Build a leakage-free dataset
 ```bash
 python -m training.build_dataset --images datasets/raw/images --labels datasets/raw/labels --out datasets/store_person
 ```
-Whole videos go to train, val or test, so the test score reflects unseen footage. A frame-level random split would inflate accuracy.
+Whole videos go to train, val or test, so the test score reflects unseen footage. A frame-level random split would inflate accuracy. The assignment and split counts are saved in `datasets/store_person/dataset_manifest.json`. Keep video stems unique across the combined datasets. You need at least three distinct source-video groups for default held-out splits.
 
 ## 5. Fine-tune YOLO11m
 ```bash
