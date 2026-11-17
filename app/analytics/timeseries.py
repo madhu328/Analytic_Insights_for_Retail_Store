@@ -49,7 +49,7 @@ def hourly_series(build: SessionBuild, matches: list[Match], transactions: list[
             "max_queue_depth": max(h["depths"]) if h["depths"] else 0,
             "transactions": h["transactions"], "revenue_inr": round(h["revenue_inr"], 2),
             "conversions": h["conversions"],
-            "conversion_rate": round(100 * h["conversions"] / h["entries"], 1) if h["entries"] else 0.0,
+            "conversion_rate": round(100 * h["conversions"] / h["entries"], 1) if h["entries"] else None,
             "avg_dwell_s": round(mean(h["dwell"]), 1) if h["dwell"] else 0.0,
         })
         cur += timedelta(hours=1)

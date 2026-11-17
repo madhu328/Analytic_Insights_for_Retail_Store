@@ -164,6 +164,8 @@ def benchmark() -> dict:
 def delta(cur, key, bench, fmt="{:+.0f}", pct=False):
     if not bench or key not in bench or not bench[key]:
         return None
+    if cur is None:
+        return None
     d = cur - bench[key]
     return (fmt.format(d) + (" pts" if pct else "")) + " vs avg"
 
@@ -202,9 +204,20 @@ with tabs[0]:
                 help="Individual visits, including re-entries.")
     c[2].metric("Converted", m["converted_visitors"],
                 help="Visitors whose billing activity matched a POS bill within the match window.")
-    c[3].metric("Conversion rate", f"{m['conversion_rate']}%",
-                delta(m["conversion_rate"], "conversion_rate", bench, "{:+.1f}", pct=True),
-                help="Converted visitors ÷ visitors.")
+    conversion_rate = m.get("conversion_rate")
+
+    c[3].metric(
+        "Conversion rate",
+        f"{conversion_rate:.1f}%" if conversion_rate is not None else "N/A",
+        delta(
+            conversion_rate,
+            "conversion_rate",
+            bench,
+            "{:+.1f}",
+            pct=True,
+        ),
+        help="Converted visitors divided by visitors. N/A means no valid visitor denominator.",
+    )
     c[4].metric("Revenue", inr_short(m["revenue_inr"]),
                 f"{100 * m['attributed_revenue_inr'] / (m['revenue_inr'] or 1):.0f}% linked to visitors",
                 delta_color="off",

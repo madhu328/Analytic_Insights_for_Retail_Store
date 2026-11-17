@@ -76,3 +76,27 @@ def test_summary_flags_unreliable_data(client):
     client.post("/pos/ingest", json=[tx(f"T{i}", 30 + i, 100.0) for i in range(5)])
     r = client.get("/insights/summary", params=P).json()
     assert r["health"]["score"] < 60 and r["insights"][0]["title"] == "Treat these numbers with caution"
+
+
+
+def test_pos_only_conversion_is_unavailable(client):
+    response = client.post(
+        "/pos/ingest",
+        json=[tx("POS_ONLY_TEST", 30, 250.0)]
+    )
+    assert response.status_code == 200
+
+    response = client.get("/metrics", params=P)
+    assert response.status_code == 200
+
+    metrics = response.json()
+
+    assert metrics["visitors"] == 0
+    assert metrics["transactions"] == 1
+    assert metrics["revenue_inr"] == 250.0
+    assert metrics["conversion_rate"] is None
+    assert metrics["revenue_per_visitor_inr"] is None
+
+    response = client.get("/insights/summary", params=P)
+    assert response.status_code == 200
+    assert "No" in response.json()["headline"] or "unavailable" in response.json()["headline"].lower()
