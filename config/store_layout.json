@@ -677,7 +677,28 @@
               ]
             ]
           },
-          "exclude_polygons": [],
+          "exclude_polygons": [
+            {
+              "polygon": [
+                [
+                  0.125,
+                  0.635
+                ],
+                [
+                  0.185,
+                  0.635
+                ],
+                [
+                  0.185,
+                  0.705
+                ],
+                [
+                  0.125,
+                  0.705
+                ]
+              ]
+            }
+          ],
           "filters": {
             "min_box_area": 0.002,
             "max_box_area": 0.6,
