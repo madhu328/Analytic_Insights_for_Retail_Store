@@ -1,0 +1,27 @@
+{
+    "model": "ResNet3D-18",
+    "dataset": "MERL Shopping Dataset",
+    "total_videos": 106,
+    "total_samples": 6503,
+    "total_subject_ids": 41,
+    "test_samples": 1161,
+    "test_accuracy": 0.9224806201550387,
+    "test_macro_precision": 0.8944734474155447,
+    "test_macro_recall": 0.9148253036475283,
+    "test_macro_f1": 0.9007079479077934,
+    "background_precision": 0.9833333333333333,
+    "background_recall": 0.9315789473684211,
+    "background_f1": 0.9567567567567568,
+    "classes": [
+        "REACH_TO_SHELF",
+        "RETRACT_FROM_SHELF",
+        "HAND_IN_SHELF",
+        "INSPECT_PRODUCT",
+        "INSPECT_SHELF",
+        "BACKGROUND"
+    ],
+    "evaluation_type": "Subject-independent clip classification",
+    "background_label_source": "Unannotated intervals with exclusion margin",
+    "selected_epoch": 15,
+    "validation_macro_f1": 0.913801859058056
+}

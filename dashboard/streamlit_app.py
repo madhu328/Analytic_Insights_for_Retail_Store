@@ -145,7 +145,7 @@ st.caption(f"{pd.Timestamp(day):%A, %d %B %Y} · open {oh.get('open', '?')}–{o
            f"{m['data_quality']['total_events']:,} camera events · {m['transactions']} POS bills" if day else store_id)
 
 tabs = st.tabs(["Overview", "Zones & heatmap", "Journeys", "Queue & anomalies", "Conversions",
-                "Forecast", "Sessions", "Store comparison", "Model accuracy"])
+                "Forecast", "Sessions", "Store comparison", "Model accuracy", "Shopping Activity"])
 
 
 def benchmark() -> dict:
@@ -525,3 +525,9 @@ with tabs[8]:
                 "`python -m training.evaluate_events --pred data/pipeline_outputs --truth training/ground_truth/<store>.csv`.")
 
 st.caption(f"Rendered {datetime.now():%Y-%m-%d %H:%M:%S}")
+
+
+# MERL shopping activity intelligence
+with tabs[9]:
+    from shopping_activity import render_shopping_activity
+    render_shopping_activity()
