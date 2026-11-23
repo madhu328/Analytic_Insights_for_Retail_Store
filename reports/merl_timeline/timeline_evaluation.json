@@ -1,0 +1,68 @@
+{
+  "video": "10_1_crop.mp4",
+  "evaluation_type": "annotated_timeline_sampling",
+  "temporal_sampling_seconds": 0.1,
+  "ground_truth_source": "data\\merl\\MERL_shopping_actions.csv",
+  "prediction_source": "C:\\Users\\madhu\\Downloads\\shopping_activity_analysis (1).csv",
+  "annotated_intervals": 43,
+  "prediction_intervals": 64,
+  "video_duration_seconds": 126.533,
+  "evaluated_time_samples": 933,
+  "evaluated_duration_approx_seconds": 93.3,
+  "ambiguous_samples_excluded": 2,
+  "unannotated_samples_excluded": 331,
+  "uncovered_annotated_samples_excluded": 0,
+  "annotated_action_accuracy": 0.6913183279742765,
+  "annotated_action_macro_f1": 0.5326416944947573,
+  "annotation_note": "Only uniquely annotated shopping-action times are scored. Unannotated gaps are not treated as verified BACKGROUND. Samples at 0.1-second spacing are temporally correlated.",
+  "classification_report": {
+    "REACH_TO_SHELF": {
+      "precision": 0.5301204819277109,
+      "recall": 0.4036697247706422,
+      "f1-score": 0.4583333333333333,
+      "support": 109.0
+    },
+    "RETRACT_FROM_SHELF": {
+      "precision": 0.5617977528089888,
+      "recall": 0.5714285714285714,
+      "f1-score": 0.56657223796034,
+      "support": 175.0
+    },
+    "HAND_IN_SHELF": {
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1-score": 0.0,
+      "support": 9.0
+    },
+    "INSPECT_PRODUCT": {
+      "precision": 0.9143576826196473,
+      "recall": 0.852112676056338,
+      "f1-score": 0.8821385176184691,
+      "support": 426.0
+    },
+    "INSPECT_SHELF": {
+      "precision": 0.9139072847682119,
+      "recall": 0.6448598130841121,
+      "f1-score": 0.7561643835616438,
+      "support": 214.0
+    },
+    "micro avg": {
+      "precision": 0.7972805933250927,
+      "recall": 0.6913183279742765,
+      "f1-score": 0.7405281285878301,
+      "support": 933.0
+    },
+    "macro avg": {
+      "precision": 0.5840366404249118,
+      "recall": 0.4944141570679328,
+      "f1-score": 0.5326416944947573,
+      "support": 933.0
+    },
+    "weighted avg": {
+      "precision": 0.7944161532776641,
+      "recall": 0.6913183279742765,
+      "f1-score": 0.7360328634127036,
+      "support": 933.0
+    }
+  }
+}
